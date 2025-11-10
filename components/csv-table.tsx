@@ -2,9 +2,11 @@
 
 import type React from "react"
 
-import { useMemo, useState, useRef, useCallback } from "react"
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react"
+import { useState, useCallback, useMemo, useEffect } from "react"
+import { ChevronLeft, ChevronRight, Search, X, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 
 interface CSVTableProps {
   headers: string[]
@@ -13,74 +15,103 @@ interface CSVTableProps {
 
 const ROW_HEIGHT = 40
 
+// Only display these specific columns
+const DISPLAY_COLUMNS = [
+  "Dokument: Datum",
+  "Dokument: ID",
+  "Dokument: Typ",
+  "Dokument: Bestellnummer",
+  "Dokument: Externe ID"
+]
+
+// Parse DD.MM.YYYY format to Date
+const parseDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null
+  const trimmed = dateStr.trim()
+  const parts = trimmed.split('.')
+  if (parts.length !== 3) return null
+  const day = parseInt(parts[0], 10)
+  const month = parseInt(parts[1], 10) - 1 // Month is 0-indexed
+  const year = parseInt(parts[2], 10)
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null
+  return new Date(year, month, day)
+}
+
+// Format Date to DD.MM.YYYY
+const formatDate = (date: Date): string => {
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}.${month}.${year}`
+}
+
 export function CSVTable({ headers, rows }: CSVTableProps) {
-  const [sortConfig, setSortConfig] = useState<{
-    key: string
-    direction: "asc" | "desc"
-  } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(20)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(headers))
-  const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const [searchValues, setSearchValues] = useState<Record<string, string>>({})
+  const [debouncedSearchValues, setDebouncedSearchValues] = useState<Record<string, string>>({})
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({})
+  const [defaultMonth, setDefaultMonth] = useState<Date | undefined>(undefined)
 
-  const toggleColumn = (header: string) => {
-    setVisibleColumns((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(header)) {
-        newSet.delete(header)
-      } else {
-        newSet.add(header)
-      }
-      return newSet
-    })
-  }
+  // Debounce search values
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValues(searchValues)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchValues])
 
-  const toggleAllColumns = () => {
-    setVisibleColumns((prev) => {
-      if (prev.size === headers.length) {
-        return new Set()
-      } else {
-        return new Set(headers)
-      }
-    })
-  }
+  // Set default month based on first valid date in the data
+  useEffect(() => {
+    if (defaultMonth) return // Already set
 
-  const sortedRows = useMemo(() => {
-    const sorted = [...rows]
-    if (sortConfig) {
-      sorted.sort((a, b) => {
-        const aVal = (a[sortConfig.key] || "").toLowerCase()
-        const bVal = (b[sortConfig.key] || "").toLowerCase()
-
-        if (sortConfig.direction === "asc") {
-          return aVal.localeCompare(bVal)
-        } else {
-          return bVal.localeCompare(aVal)
+    for (const row of rows) {
+      const dateStr = row["Dokument: Datum"]
+      if (dateStr) {
+        const parsedDate = parseDate(dateStr)
+        if (parsedDate) {
+          setDefaultMonth(parsedDate)
+          break
         }
+      }
+    }
+  }, [rows, defaultMonth])
+
+  // Filter rows based on search values
+  const filteredRows = useMemo(() => {
+    let filtered = rows
+
+    // Apply date filter
+    if (selectedDate) {
+      const selectedDateStr = formatDate(selectedDate)
+      filtered = filtered.filter((row) => {
+        const rowDateStr = (row["Dokument: Datum"] || '').trim()
+        return rowDateStr === selectedDateStr
       })
     }
-    return sorted
-  }, [rows, sortConfig])
 
-  const filteredHeaders = useMemo(() => {
-    return headers.filter((h) => visibleColumns.has(h))
-  }, [headers, visibleColumns])
+    // Apply text filters
+    const activeFilters = Object.entries(debouncedSearchValues).filter(([_, value]) => value.trim() !== '')
 
-  const totalPages = Math.ceil(sortedRows.length / rowsPerPage)
+    if (activeFilters.length > 0) {
+      filtered = filtered.filter((row) => {
+        return activeFilters.every(([column, searchValue]) => {
+          const cellValue = (row[column] || '').toLowerCase()
+          const search = searchValue.toLowerCase()
+          return cellValue.includes(search)
+        })
+      })
+    }
+
+    return filtered
+  }, [rows, debouncedSearchValues, selectedDate])
+
+  const totalPages = Math.ceil(filteredRows.length / rowsPerPage)
   const startIndex = (currentPage - 1) * rowsPerPage
   const endIndex = startIndex + rowsPerPage
-  const visibleRows = sortedRows.slice(startIndex, endIndex)
-
-  const handleSort = useCallback((key: string) => {
-    setSortConfig((prev) => {
-      if (prev?.key === key) {
-        return prev.direction === "asc" ? { key, direction: "desc" } : null
-      }
-      return { key, direction: "asc" }
-    })
-    setCurrentPage(1)
-  }, [])
+  const visibleRows = filteredRows.slice(startIndex, endIndex)
 
   const handlePreviousPage = useCallback(() => {
     setCurrentPage((prev) => Math.max(1, prev - 1))
@@ -95,83 +126,132 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
     setCurrentPage(1)
   }, [])
 
+  const handleSearchChange = useCallback((column: string, value: string) => {
+    setSearchValues((prev) => ({
+      ...prev,
+      [column]: value,
+    }))
+  }, [])
+
+  const clearSearch = useCallback((column: string) => {
+    setSearchValues((prev) => {
+      const newValues = { ...prev }
+      delete newValues[column]
+      return newValues
+    })
+  }, [])
+
+  const clearDateFilter = useCallback(() => {
+    setSelectedDate(undefined)
+  }, [])
+
+  const togglePopover = useCallback((column: string) => {
+    setOpenPopovers((prev) => ({
+      ...prev,
+      [column]: !prev[column],
+    }))
+  }, [])
+
+  const hasActiveFilters = Object.keys(searchValues).length > 0 || selectedDate !== undefined
+
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden flex flex-col">
-      {/* Column Selector */}
-      <div className="border-b border-border bg-muted/20 px-4 py-3">
-        <div className="relative">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowColumnSelector(!showColumnSelector)}
-            className="gap-2 bg-transparent"
-          >
-            {showColumnSelector ? (
-              <>
-                <EyeOff className="h-4 w-4" />
-                Hide Columns
-              </>
-            ) : (
-              <>
-                <Eye className="h-4 w-4" />
-                Show Columns ({visibleColumns.size}/{headers.length})
-              </>
-            )}
-          </Button>
-
-          {showColumnSelector && (
-            <div className="absolute top-10 left-0 mt-1 z-10 bg-background border border-border rounded-lg shadow-lg max-h-96 overflow-y-auto min-w-max">
-              <div className="sticky top-0 bg-muted/50 border-b border-border px-4 py-2">
-                <button
-                  onClick={toggleAllColumns}
-                  className="text-sm font-medium text-foreground hover:text-primary transition-colors"
-                >
-                  {visibleColumns.size === headers.length ? "Deselect All" : "Select All"}
-                </button>
-              </div>
-              <div className="p-3 space-y-1 max-h-80">
-                {headers.map((header) => (
-                  <label
-                    key={header}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-muted transition-colors whitespace-nowrap min-w-max px-2 py-1 rounded"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns.has(header)}
-                      onChange={() => toggleColumn(header)}
-                      className="cursor-pointer"
-                    />
-                    <span className="text-sm text-foreground truncate max-w-xs" title={header}>
-                      {header}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Header and Body Table */}
       <div className="overflow-x-auto flex-1 flex flex-col">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-10">
+          <table className="w-full text-base border-collapse">
+            <thead className="sticky top-0 z-10 bg-background">
               <tr className="bg-muted/50 border-b border-border">
-                {filteredHeaders.map((header) => (
+                {DISPLAY_COLUMNS.map((header) => (
                   <th
                     key={header}
-                    className="px-4 py-3 text-left font-semibold text-foreground cursor-pointer hover:bg-muted transition-colors whitespace-nowrap min-w-max"
-                    onClick={() => handleSort(header)}
+                    className="px-6 py-4 text-left font-semibold text-foreground whitespace-nowrap min-w-max"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs">{header}</span>
-                      {sortConfig?.key === header &&
-                        (sortConfig.direction === "asc" ? (
-                          <ChevronUp className="h-3 w-3 flex-shrink-0" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3 flex-shrink-0" />
-                        ))}
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold">{header}</span>
+                      {header === "Dokument: Datum" ? (
+                        <Popover
+                          open={openPopovers[header]}
+                          onOpenChange={() => togglePopover(header)}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className={`p-1.5 rounded hover:bg-muted transition-colors ${
+                                selectedDate ? "text-primary" : "text-muted-foreground"
+                              }`}
+                            >
+                              <CalendarIcon className="h-4 w-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            {selectedDate && (
+                              <div className="p-4 border-b border-border">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-sm text-muted-foreground">
+                                    Selected: {formatDate(selectedDate)}
+                                  </span>
+                                  <button
+                                    onClick={clearDateFilter}
+                                    className="text-muted-foreground hover:text-foreground p-1.5 rounded hover:bg-muted"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date) => {
+                                setSelectedDate(date)
+                                togglePopover(header)
+                              }}
+                              defaultMonth={defaultMonth}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <Popover
+                          open={openPopovers[header]}
+                          onOpenChange={() => togglePopover(header)}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className={`p-1.5 rounded hover:bg-muted transition-colors ${
+                                searchValues[header] ? "text-primary" : "text-muted-foreground"
+                              }`}
+                            >
+                              <Search className="h-4 w-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72 p-4" align="start">
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium text-foreground">
+                                Search {header}
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Type to search..."
+                                  value={searchValues[header] || ''}
+                                  onChange={(e) => handleSearchChange(header, e.target.value)}
+                                  className="w-full px-4 py-2.5 text-base border border-border rounded bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  autoFocus
+                                />
+                                {searchValues[header] && (
+                                  <button
+                                    onClick={() => clearSearch(header)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                   </th>
                 ))}
@@ -182,12 +262,12 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
                 <tr
                   key={startIndex + idx}
                   className="border-b border-border hover:bg-muted/30 transition-colors"
-                  style={{ height: `${ROW_HEIGHT}px` }}
+                  style={{ height: `${ROW_HEIGHT + 12}px` }}
                 >
-                  {filteredHeaders.map((header) => (
+                  {DISPLAY_COLUMNS.map((header) => (
                     <td
-                      key={`${startIndex + idx}-${header}`}
-                      className="px-4 py-3 text-foreground text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-xs"
+                      key={header}
+                      className="px-6 py-4 text-foreground text-base whitespace-nowrap overflow-hidden text-ellipsis max-w-xs"
                       title={row[header]}
                     >
                       {row[header]}
@@ -200,15 +280,15 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
         </div>
       </div>
 
-      <div className="border-t border-border bg-muted/30 px-4 py-4 space-y-4">
+      <div className="border-t border-border bg-muted/30 px-6 py-5 space-y-5">
         {/* Pagination Info and Rows Per Page */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 text-base text-muted-foreground">
             <span>Show</span>
             <select
               value={rowsPerPage}
               onChange={handleRowsPerPageChange}
-              className="rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+              className="rounded border border-border bg-background px-3 py-2 text-base text-foreground"
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -218,9 +298,10 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
             <span>rows per page</span>
           </div>
 
-          <div className="text-xs text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(endIndex, sortedRows.length)} of {sortedRows.length.toLocaleString()}{" "}
-            rows • {filteredHeaders.length} columns
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredRows.length)} of {filteredRows.length.toLocaleString()}{" "}
+            {hasActiveFilters && `(filtered from ${rows.length.toLocaleString()}) `}
+            rows • {DISPLAY_COLUMNS.length} columns
           </div>
         </div>
 
@@ -228,17 +309,17 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
         <div className="flex items-center justify-between gap-2">
           <Button
             variant="outline"
-            size="sm"
+            size="default"
             onClick={handlePreviousPage}
             disabled={currentPage === 1}
-            className="gap-1 bg-transparent"
+            className="gap-2 bg-transparent"
           >
             <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-foreground">
+            <span className="text-base text-foreground">
               Page <span className="font-semibold">{currentPage}</span> of{" "}
               <span className="font-semibold">{totalPages}</span>
             </span>
@@ -246,10 +327,10 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
 
           <Button
             variant="outline"
-            size="sm"
+            size="default"
             onClick={handleNextPage}
             disabled={currentPage === totalPages}
-            className="gap-1 bg-transparent"
+            className="gap-2 bg-transparent"
           >
             Next
             <ChevronRight className="h-4 w-4" />

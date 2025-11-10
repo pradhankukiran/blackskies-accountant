@@ -1,30 +1,33 @@
-# CSV uploader with table
-
-*Automatically synced with your [v0.app](https://v0.app) deployments*
-
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/pradhankukiran-projects/v0-csv-uploader-with-table)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/dZDcF6lSBbv)
+# CSV Uploader with Table
 
 ## Overview
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+A Next.js application for uploading and displaying CSV files in an interactive table format.
 
 ## Deployment
 
 Your project is live at:
 
-**[https://vercel.com/pradhankukiran-projects/v0-csv-uploader-with-table](https://vercel.com/pradhankukiran-projects/v0-csv-uploader-with-table)**
+**[https://vercel.com/pradhankukiran-projects/csv-uploader-with-table](https://vercel.com/pradhankukiran-projects/csv-uploader-with-table)**
 
-## Build your app
+## Development
 
-Continue building your app on:
+To run the development server:
 
-**[https://v0.app/chat/dZDcF6lSBbv](https://v0.app/chat/dZDcF6lSBbv)**
+```bash
+npm run dev
+# or
+pnpm dev
+```
 
-## How It Works
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+## Build
+
+To build the application for production:
+
+```bash
+npm run build
+# or
+pnpm build
+```

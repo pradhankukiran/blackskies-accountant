@@ -178,41 +178,41 @@ export function CSVUploader() {
         />
 
         <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="rounded-lg bg-primary/10 p-3">
-            <Upload className="h-6 w-6 text-primary" />
+          <div className="rounded-lg bg-primary/10 p-4">
+            <Upload className="h-8 w-8 text-primary" />
           </div>
           <div className="text-center">
-            <h3 className="font-semibold text-foreground">
+            <h3 className="text-lg font-semibold text-foreground">
               {loading ? "Processing..." : "Drag and drop your CSV file"}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">or click to browse</p>
+            <p className="mt-2 text-base text-muted-foreground">or click to browse</p>
           </div>
-          <Button disabled={loading}>{loading ? "Processing..." : "Select File"}</Button>
+          <Button disabled={loading} className="text-base px-6 py-2">{loading ? "Processing..." : "Select File"}</Button>
         </div>
       </div>
 
       {/* Error Display */}
       {error && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" />
+        <div className="flex items-start gap-4 rounded-lg border border-destructive/50 bg-destructive/10 p-5">
+          <AlertCircle className="mt-0.5 h-6 w-6 flex-shrink-0 text-destructive" />
           <div>
-            <h4 className="font-semibold text-destructive">Error</h4>
-            <p className="mt-1 text-sm text-destructive/80">{error}</p>
+            <h4 className="text-base font-semibold text-destructive">Error</h4>
+            <p className="mt-2 text-base text-destructive/80">{error}</p>
           </div>
         </div>
       )}
 
       {/* Data Display */}
       {csvData && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-foreground">Data Preview</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h2 className="text-2xl font-semibold text-foreground">Data Preview</h2>
+              <p className="mt-2 text-base text-muted-foreground">
                 {csvData.rows.length.toLocaleString()} rows, {csvData.headers.length} columns
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleClear} className="gap-2 bg-transparent">
+            <Button variant="outline" size="default" onClick={handleClear} className="gap-2 bg-transparent text-base px-5">
               <X className="h-4 w-4" />
               Clear
             </Button>
