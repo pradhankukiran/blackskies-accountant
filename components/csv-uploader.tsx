@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useCallback, useRef, useState } from "react"
-import { Upload, X, AlertCircle } from "lucide-react"
+import { Upload, X, AlertCircle, FilterX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CSVTable } from "./csv-table"
 
@@ -16,7 +16,9 @@ export function CSVUploader() {
   const [csvData, setCSVData] = useState<CSVData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasActiveFilters, setHasActiveFilters] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const clearFiltersRef = useRef<(() => void) | null>(null)
 
   const parseCSV = useCallback((text: string): CSVData => {
     const lines = text.split("\n")
@@ -138,6 +140,12 @@ export function CSVUploader() {
     }
   }, [])
 
+  const handleClearFilters = useCallback(() => {
+    if (clearFiltersRef.current) {
+      clearFiltersRef.current()
+    }
+  }, [])
+
   return (
     <div className="space-y-6">
       {/* Upload Area */}
@@ -212,13 +220,31 @@ export function CSVUploader() {
                 {csvData.rows.length.toLocaleString()} rows, {csvData.headers.length} columns
               </p>
             </div>
-            <Button variant="outline" size="default" onClick={handleClear} className="gap-2 bg-transparent text-base px-5">
-              <X className="h-4 w-4" />
-              Clear
-            </Button>
+            <div className="flex items-center gap-3">
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={handleClearFilters}
+                  className="gap-2 bg-transparent text-base px-5"
+                >
+                  <FilterX className="h-4 w-4" />
+                  Clear Filters
+                </Button>
+              )}
+              <Button variant="outline" size="default" onClick={handleClear} className="gap-2 bg-transparent text-base px-5">
+                <X className="h-4 w-4" />
+                Clear
+              </Button>
+            </div>
           </div>
 
-          <CSVTable headers={csvData.headers} rows={csvData.rows} />
+          <CSVTable
+            headers={csvData.headers}
+            rows={csvData.rows}
+            onFiltersChange={setHasActiveFilters}
+            clearFiltersRef={clearFiltersRef}
+          />
         </div>
       )}
     </div>

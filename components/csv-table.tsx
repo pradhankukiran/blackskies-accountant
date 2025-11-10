@@ -11,6 +11,8 @@ import { Calendar } from "@/components/ui/calendar"
 interface CSVTableProps {
   headers: string[]
   rows: Record<string, string>[]
+  onFiltersChange?: (hasFilters: boolean) => void
+  clearFiltersRef?: React.MutableRefObject<(() => void) | null>
 }
 
 const ROW_HEIGHT = 40
@@ -45,7 +47,7 @@ const formatDate = (date: Date): string => {
   return `${day}.${month}.${year}`
 }
 
-export function CSVTable({ headers, rows }: CSVTableProps) {
+export function CSVTable({ headers, rows, onFiltersChange, clearFiltersRef }: CSVTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(20)
   const [searchValues, setSearchValues] = useState<Record<string, string>>({})
@@ -154,6 +156,21 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
 
   const hasActiveFilters = Object.keys(searchValues).length > 0 || selectedDate !== undefined
 
+  // Notify parent when filters change
+  useEffect(() => {
+    onFiltersChange?.(hasActiveFilters)
+  }, [hasActiveFilters, onFiltersChange])
+
+  // Expose clear filters function to parent
+  useEffect(() => {
+    if (clearFiltersRef) {
+      clearFiltersRef.current = () => {
+        setSearchValues({})
+        setSelectedDate(undefined)
+      }
+    }
+  }, [clearFiltersRef])
+
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden flex flex-col">
       {/* Header and Body Table */}
@@ -162,6 +179,9 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
           <table className="w-full text-base border-collapse">
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="bg-muted/50 border-b border-border">
+                <th className="px-6 py-4 text-left font-semibold text-foreground whitespace-nowrap">
+                  <span className="text-sm font-semibold">S.No</span>
+                </th>
                 {DISPLAY_COLUMNS.map((header) => (
                   <th
                     key={header}
@@ -264,6 +284,9 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
                   className="border-b border-border hover:bg-muted/30 transition-colors"
                   style={{ height: `${ROW_HEIGHT + 12}px` }}
                 >
+                  <td className="px-6 py-4 text-foreground text-base whitespace-nowrap text-muted-foreground font-medium">
+                    {startIndex + idx + 1}
+                  </td>
                   {DISPLAY_COLUMNS.map((header) => (
                     <td
                       key={header}
@@ -301,7 +324,7 @@ export function CSVTable({ headers, rows }: CSVTableProps) {
           <div className="text-sm text-muted-foreground">
             Showing {startIndex + 1} to {Math.min(endIndex, filteredRows.length)} of {filteredRows.length.toLocaleString()}{" "}
             {hasActiveFilters && `(filtered from ${rows.length.toLocaleString()}) `}
-            rows • {DISPLAY_COLUMNS.length} columns
+            rows • {DISPLAY_COLUMNS.length + 1} columns
           </div>
         </div>
 
