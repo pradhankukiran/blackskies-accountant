@@ -54,7 +54,16 @@ export function CSVTable({ headers, rows, onFiltersChange, clearFiltersRef }: CS
   const [debouncedSearchValues, setDebouncedSearchValues] = useState<Record<string, string>>({})
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [openPopovers, setOpenPopovers] = useState<Record<string, boolean>>({})
-  const [defaultMonth, setDefaultMonth] = useState<Date | undefined>(undefined)
+
+  const defaultMonth = useMemo(() => {
+    for (const row of rows) {
+      const dateStr = row["Dokument: Datum"]
+      if (!dateStr) continue
+      const parsedDate = parseDate(dateStr)
+      if (parsedDate) return parsedDate
+    }
+    return undefined
+  }, [rows])
 
   // Debounce search values
   useEffect(() => {
@@ -64,22 +73,6 @@ export function CSVTable({ headers, rows, onFiltersChange, clearFiltersRef }: CS
     }, 300)
     return () => clearTimeout(timer)
   }, [searchValues])
-
-  // Set default month based on first valid date in the data
-  useEffect(() => {
-    if (defaultMonth) return // Already set
-
-    for (const row of rows) {
-      const dateStr = row["Dokument: Datum"]
-      if (dateStr) {
-        const parsedDate = parseDate(dateStr)
-        if (parsedDate) {
-          setDefaultMonth(parsedDate)
-          break
-        }
-      }
-    }
-  }, [rows, defaultMonth])
 
   // Filter rows based on search values
   const filteredRows = useMemo(() => {
