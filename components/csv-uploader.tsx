@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useCallback, useRef, useState } from "react"
 import { Upload, X, AlertCircle, FilterX } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { CSVTable } from "./csv-table"
 
@@ -17,6 +18,7 @@ export function CSVUploader() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasActiveFilters, setHasActiveFilters] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const clearFiltersRef = useRef<(() => void) | null>(null)
 
@@ -149,104 +151,179 @@ export function CSVUploader() {
   return (
     <div className="space-y-6">
       {/* Upload Area */}
-      <div
-        className="relative rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary hover:bg-muted/50"
-        onClick={() => fileInputRef.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault()
-          e.currentTarget.classList.add("border-primary", "bg-muted/50")
-        }}
-        onDragLeave={(e) => {
-          e.currentTarget.classList.remove("border-primary", "bg-muted/50")
-        }}
-        onDrop={(e) => {
-          e.preventDefault()
-          e.currentTarget.classList.remove("border-primary", "bg-muted/50")
-          const file = e.dataTransfer.files?.[0]
-          if (file) {
-            const input = fileInputRef.current
-            if (input) {
-              const dataTransfer = new DataTransfer()
-              dataTransfer.items.add(file)
-              input.files = dataTransfer.files
-              handleFileChange({
-                target: input,
-              } as React.ChangeEvent<HTMLInputElement>)
-            }
-          }
-        }}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleFileChange}
-          className="hidden"
-          disabled={loading}
-        />
+      <AnimatePresence mode="wait">
+        {!csvData ? (
+          <motion.div
+            key="uploader"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-6"
+          >
+            {/* Upload Area */}
+            <motion.div
+              className="relative rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 transition-colors min-h-[300px] flex items-center justify-center"
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+                e.preventDefault()
+                setIsDragging(true)
+                e.currentTarget.classList.add("border-primary", "bg-muted/50")
+              }}
+              onDragLeave={(e: React.DragEvent<HTMLDivElement>) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return
+                setIsDragging(false)
+                e.currentTarget.classList.remove("border-primary", "bg-muted/50")
+              }}
+              onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+                e.preventDefault()
+                setIsDragging(false)
+                e.currentTarget.classList.remove("border-primary", "bg-muted/50")
+                const file = e.dataTransfer.files?.[0]
+                if (file) {
+                  const input = fileInputRef.current
+                  if (input) {
+                    const dataTransfer = new DataTransfer()
+                    dataTransfer.items.add(file)
+                    input.files = dataTransfer.files
+                    handleFileChange({
+                      target: input,
+                    } as React.ChangeEvent<HTMLInputElement>)
+                  }
+                }
+              }}
+              animate={{
+                scale: isDragging ? 1.02 : 1,
+                borderColor: isDragging ? "hsl(var(--primary))" : "hsl(var(--border))",
+                backgroundColor: isDragging
+                  ? "hsl(var(--muted)/0.5)"
+                  : "hsl(var(--muted)/0.3)",
+              }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileChange}
+                className="hidden"
+                disabled={loading}
+              />
 
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="rounded-lg bg-primary/10 p-4">
-            <Upload className="h-8 w-8 text-primary" />
-          </div>
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-foreground">
-              {loading ? "Processing..." : "Drag and drop your CSV file"}
-            </h3>
-            <p className="mt-2 text-base text-muted-foreground">or click to browse</p>
-          </div>
-          <Button disabled={loading} className="text-base px-6 py-2">{loading ? "Processing..." : "Select File"}</Button>
-        </div>
-      </div>
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <motion.div
+                  layout
+                  className="rounded-lg bg-primary/10 p-4"
+                  animate={{ scale: isDragging ? 1.1 : 1 }}
+                >
+                  <Upload className="h-8 w-8 text-primary" />
+                </motion.div>
+                <div className="text-center">
+                  <motion.h3
+                    layout
+                    className="text-lg font-semibold text-foreground"
+                  >
+                    {loading
+                      ? "Processing..."
+                      : isDragging
+                        ? "Drop here"
+                        : "Drag and drop your CSV file"}
+                  </motion.h3>
+                  <motion.p
+                    layout
+                    className="mt-2 text-base text-muted-foreground"
+                  >
+                    {isDragging ? "Release to upload" : "or click to browse"}
+                  </motion.p>
+                </div>
+                <div className="relative h-10 w-full flex justify-center">
+                  <AnimatePresence>
+                    {!isDragging && (
+                      <motion.div
+                        className="absolute"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Button
+                          disabled={loading}
+                          className="text-base px-6 py-2 cursor-pointer"
+                        >
+                          {loading ? "Processing..." : "Select File"}
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </motion.div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="flex items-start gap-4 rounded-lg border border-destructive/50 bg-destructive/10 p-5">
-          <AlertCircle className="mt-0.5 h-6 w-6 flex-shrink-0 text-destructive" />
-          <div>
-            <h4 className="text-base font-semibold text-destructive">Error</h4>
-            <p className="mt-2 text-base text-destructive/80">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Data Display */}
-      {csvData && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-foreground">Data Preview</h2>
-              <p className="mt-2 text-base text-muted-foreground">
-                {csvData.rows.length.toLocaleString()} rows, {csvData.headers.length} columns
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {hasActiveFilters && (
+            {/* Error Display */}
+            {error && (
+              <div className="flex items-start gap-4 rounded-lg border border-destructive/50 bg-destructive/10 p-5">
+                <AlertCircle className="mt-0.5 h-6 w-6 flex-shrink-0 text-destructive" />
+                <div>
+                  <h4 className="text-base font-semibold text-destructive">
+                    Error
+                  </h4>
+                  <p className="mt-2 text-base text-destructive/80">{error}</p>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="table"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-5"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-foreground">
+                  Data Preview
+                </h2>
+                <p className="mt-2 text-base text-muted-foreground">
+                  {csvData.rows.length.toLocaleString()} rows,{" "}
+                  {csvData.headers.length} columns
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={handleClearFilters}
+                    className="gap-2 bg-transparent text-base px-5"
+                  >
+                    <FilterX className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="default"
-                  onClick={handleClearFilters}
+                  onClick={handleClear}
                   className="gap-2 bg-transparent text-base px-5"
                 >
-                  <FilterX className="h-4 w-4" />
-                  Clear Filters
+                  <X className="h-4 w-4" />
+                  Clear
                 </Button>
-              )}
-              <Button variant="outline" size="default" onClick={handleClear} className="gap-2 bg-transparent text-base px-5">
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
+              </div>
             </div>
-          </div>
 
-          <CSVTable
-            headers={csvData.headers}
-            rows={csvData.rows}
-            onFiltersChange={setHasActiveFilters}
-            clearFiltersRef={clearFiltersRef}
-          />
-        </div>
-      )}
+            <CSVTable
+              headers={csvData.headers}
+              rows={csvData.rows}
+              onFiltersChange={setHasActiveFilters}
+              clearFiltersRef={clearFiltersRef}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
